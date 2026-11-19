@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Leave Management System</title>
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --primary-dark: #3730a3;
+      --primary-light: #e0e7ff;
+      --success: #16a34a;
+      --success-bg: #dcfce7;
+      --danger: #dc2626;
+      --danger-bg: #fee2e2;
+      --warning: #d97706;
+      --warning-bg: #fef3c7;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --border: #e5e7eb;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* NAV */
+    nav { background: var(--primary); color: #fff; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 58px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,.18); }
+    nav h1 { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .db-pill { font-size: 11px; background: rgba(255,255,255,.18); padding: 3px 10px; border-radius: 20px; display: flex; align-items: center; gap: 5px; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; }
+    .dot.off { background: #f87171; }
+
+    /* TABS */
+    .tabs { display: flex; gap: 4px; padding: 16px 24px 0; overflow-x: auto; }
+    .tab { padding: 10px 20px; border: none; background: transparent; color: var(--muted); font-size: 14px; font-weight: 600; cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; }
+    .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+    /* MAIN */
+    .main { padding: 20px 24px; max-width: 1100px; margin: 0 auto; }
+
+    /* STAT CARDS */
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 20px; }
+    .stat-card { background: var(--card); border-radius: 12px; padding: 18px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+    .stat-num { font-size: 36px; font-weight: 800; }
+    .stat-label { font-size: 12px; color: var(--muted); margin-top: 4px; font-weight: 600; }
+    .stat-total .stat-num { color: var(--primary); }
+    .stat-pending .stat-num { color: var(--warning); }
+    .stat-approved .stat-num { color: var(--success); }
+    .stat-rejected .stat-num { color: var(--danger); }
+
+    /* CARDS */
+    .card { background: var(--card); border-radius: 14px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,.07); border: 1px solid var(--border); margin-bottom: 20px; }
+    .card-title { font-size: 17px; font-weight: 700; margin-bottom: 18px; color: #111827; }
+
+    /* FORM */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media(max-width:640px) { .form-grid { grid-template-columns: 1fr; } }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group.full { grid-column: 1 / -1; }
+    label { font-size: 13px; font-weight: 600; color: #374151; }
+    input, select, textarea { padding: 10px 13px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 14px; outline: none; background: #fafafa; transition: border-color .2s, box-shadow .2s; }
+    input:focus, select:focus, textarea:focus { border-color: var(--primary); background: #fff; box-shadow: 0 0 0 3px rgba(79,70,229,.12); }
+    textarea { resize: vertical; min-height: 80px; }
+    .btn { padding: 11px 22px; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; transition: background .2s, transform .1s; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-primary:disabled { opacity: .6; cursor: not-allowed; }
+    .btn-sm { padding: 6px 12px; font-size: 12px; font-weight: 600; border: none; border-radius: 6px; cursor: pointer; }
+    .btn-approve { background: var(--success-bg); color: var(--success); }
+    .btn-approve:hover { background: #bbf7d0; }
+    .btn-reject { background: var(--danger-bg); color: var(--danger); }
+    .btn-reject:hover { background: #fecaca; }
+    .btn-del { background: #f3f4f6; color: #374151; }
+    .btn-del:hover { background: #e5e7eb; }
+
+    /* ALERT */
+    .alert { padding: 12px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; margin-bottom: 16px; display: none; }
+    .alert.show { display: block; animation: fadeIn .3s ease; }
+    .alert-success { background: var(--success-bg); color: var(--success); border: 1px solid #a7f3d0; }
+    .alert-error { background: var(--danger-bg); color: var(--danger); border: 1px solid #fecaca; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:none; } }
+
+    /* FILTER BAR */
+    .filter-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+    .filter-btn { background: var(--primary-light); color: var(--primary); padding: 7px 16px; font-size: 12px; font-weight: 600; border: none; border-radius: 20px; cursor: pointer; }
+    .filter-btn.active { background: var(--primary); color: #fff; }
+
+    /* LEAVE TABLE */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { background: #f8fafc; padding: 10px 12px; text-align: left; font-weight: 700; color: #374151; border-bottom: 2px solid var(--border); white-space: nowrap; }
+    td { padding: 10px 12px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+    tr:hover td { background: #f9fafb; }
+    .badge { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 12px; }
+    .badge-pending { background: var(--warning-bg); color: var(--warning); }
+    .badge-approved { background: var(--success-bg); color: var(--success); }
+    .badge-rejected { background: var(--danger-bg); color: var(--danger); }
+    .actions-cell { display: flex; gap: 6px; }
+    .info-text { text-align: center; color: var(--muted); padding: 24px; font-style: italic; }
+    .section-hidden { display: none; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <h1>🏢 Leave Management System</h1>
+  <div class="db-pill">
+    <span class="dot" id="dbDot"></span>
+    <span id="dbStatus">Connecting...</span>
+  </div>
+</nav>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTab('dashboard',this)">📊 Dashboard</button>
+  <button class="tab" onclick="showTab('apply',this)">➕ Apply Leave</button>
+  <button class="tab" onclick="showTab('all-leaves',this)">📋 All Leaves</button>
+  <button class="tab" onclick="showTab('employees',this)">👥 Employees</button>
+</div>
+
+<div class="main">
+
+  <!-- ALERT -->
+  <div id="alertBox" class="alert"></div>
+
+  <!-- DASHBOARD -->
+  <div id="tab-dashboard">
+    <div class="stats" id="statsGrid">
+      <div class="stat-card stat-total"><div class="stat-num" id="statTotal">—</div><div class="stat-label">Total Applications</div></div>
+      <div class="stat-card stat-pending"><div class="stat-num" id="statPending">—</div><div class="stat-label">Pending</div></div>
+      <div class="stat-card stat-approved"><div class="stat-num" id="statApproved">—</div><div class="stat-label">Approved</div></div>
+      <div class="stat-card stat-rejected"><div class="stat-num" id="statRejected">—</div><div class="stat-label">Rejected</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Recent Leave Applications</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Employee</th><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Status</th><th>Applied On</th></tr></thead>
+          <tbody id="recentLeaves"><tr><td colspan="7" class="info-text">Loading from MongoDB...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- APPLY LEAVE -->
+  <div id="tab-apply" class="section-hidden">
+    <div class="card">
+      <div class="card-title">Submit Leave Application</div>
+      <form id="leaveForm">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="empName">Employee Name *</label>
+            <input id="empName" type="text" placeholder="Your full name" required />
+          </div>
+          <div class="form-group">
+            <label for="empEmail">Email *</label>
+            <input id="empEmail" type="email" placeholder="employee@company.com" required />
+          </div>
+          <div class="form-group">
+            <label for="empDept">Department</label>
+            <select id="empDept">
+              <option value="General">General</option>
+              <option value="Engineering">Engineering</option>
+              <option value="HR">HR</option>
+              <option value="Finance">Finance</option>
+              <option value="Marketing">Marketing</option>
+              <option value="Operations">Operations</option>
+              <option value="Sales">Sales</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="leaveType">Leave Type *</label>
+            <select id="leaveType">
+              <option value="Casual">Casual Leave</option>
+              <option value="Medical">Medical Leave</option>
+              <option value="Annual">Annual Leave</option>
+              <option value="Maternity">Maternity Leave</option>
+              <option value="Paternity">Paternity Leave</option>
+              <option value="Unpaid">Unpaid Leave</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="startDate">Start Date *</label>
+            <input id="startDate" type="date" required />
+          </div>
+          <div class="form-group">
+            <label for="endDate">End Date *</label>
+            <input id="endDate" type="date" required />
+          </div>
+          <div class="form-group full">
+            <label for="reason">Reason *</label>
+            <textarea id="reason" placeholder="Briefly explain the reason for leave..." required></textarea>
+          </div>
+        </div>
+        <div style="margin-top:16px; display:flex; gap:12px; align-items:center;">
+          <button type="submit" class="btn btn-primary" id="submitBtn">Submit Application</button>
+          <span id="daysPreview" style="font-size:13px;color:var(--primary);font-weight:600;"></span>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ALL LEAVES -->
+  <div id="tab-all-leaves" class="section-hidden">
+    <div class="card">
+      <div class="card-title">All Leave Applications</div>
+      <div class="filter-bar">
+        <span style="font-size:13px;font-weight:600;color:var(--muted);">Filter:</span>
+        <button class="filter-btn active" onclick="filterLeaves('All',this)">All</button>
+        <button class="filter-btn" onclick="filterLeaves('Pending',this)">Pending</button>
+        <button class="filter-btn" onclick="filterLeaves('Approved',this)">Approved</button>
+        <button class="filter-btn" onclick="filterLeaves('Rejected',this)">Rejected</button>
+        <button class="btn btn-primary btn-sm" style="margin-left:auto;" onclick="loadLeaves()">🔄 Refresh</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Employee</th><th>Dept</th><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Reason</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="allLeavesBody"><tr><td colspan="9" class="info-text">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- EMPLOYEES -->
+  <div id="tab-employees" class="section-hidden">
+    <div class="card">
+      <div class="card-title">Add New Employee</div>
+      <form id="empForm">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Name *</label>
+            <input id="newEmpName" type="text" placeholder="Full name" required />
+          </div>
+          <div class="form-group">
+            <label>Email *</label>
+            <input id="newEmpEmail" type="email" placeholder="email@company.com" required />
+          </div>
+          <div class="form-group">
+            <label>Department</label>
+            <select id="newEmpDept">
+              <option>General</option><option>Engineering</option><option>HR</option>
+              <option>Finance</option><option>Marketing</option><option>Operations</option><option>Sales</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Role</label>
+            <select id="newEmpRole">
+              <option value="Employee">Employee</option>
+              <option value="Manager">Manager</option>
+              <option value="HR">HR</option>
+              <option value="Admin">Admin</option>
+            </select>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="margin-top:14px;">Add Employee</button>
+      </form>
+    </div>
+    <div class="card">
+      <div class="card-title">Employee Directory</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Email</th><th>Department</th><th>Role</th><th>Casual</th><th>Medical</th><th>Annual</th><th>Actions</th></tr></thead>
+          <tbody id="empTableBody"><tr><td colspan="8" class="info-text">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  const BASE = isLocal ? 'http://localhost:5000' : '';
+  let allLeaveData = [];
+  let currentFilter = 'All';
+
+  // ==========================================
+  function showTab(id, btn) {
+    document.querySelectorAll('[id^="tab-"]').forEach(el => el.classList.add('section-hidden'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + id).classList.remove('section-hidden');
+    btn.classList.add('active');
+    if (id === 'dashboard') { loadStats(); loadRecentLeaves(); }
+    if (id === 'all-leaves') loadLeaves();
+    if (id === 'employees') loadEmployees();
+  }
+
+  // ==========================================
+  function showAlert(msg, isError = false) {
+    const el = document.getElementById('alertBox');
+    el.className = 'alert show ' + (isError ? 'alert-error' : 'alert-success');
+    el.textContent = msg;
+    setTimeout(() => el.classList.remove('show'), 5000);
+  }
+
+  function escH(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function fmtDate(d) {
+    if (!d) return '—';
+    return new Date(d).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+  }
+
+  function badgeHtml(status) {
+    const cls = { Pending: 'badge-pending', Approved: 'badge-approved', Rejected: 'badge-rejected' };
+    return `<span class="badge ${cls[status]||'badge-pending'}">${status}</span>`;
+  }
+
+  // ==========================================
+  async function checkHealth() {
+    try {
+      const r = await fetch(BASE + '/api/health', { cache: 'no-store' });
+      const d = await r.json();
+      const dot = document.getElementById('dbDot');
+      const lbl = document.getElementById('dbStatus');
+      if (d.database === 'Connected') {
+        dot.classList.remove('off');
+        lbl.textContent = 'MongoDB: ' + (d.dbName || 'leave_management');
+      } else {
+        dot.classList.add('off');
+        lbl.textContent = 'DB Disconnected';
+      }
+    } catch {
+      document.getElementById('dbDot').classList.add('off');
+      document.getElementById('dbStatus').textContent = 'Server Offline';
+    }
+  }
+
+  // ==========================================
+  async function loadStats() {
+    try {
+      const r = await fetch(BASE + '/api/stats', { cache: 'no-store' });
+      const d = await r.json();
+      if (d.success) {
+        document.getElementById('statTotal').textContent = d.data.total;
+        document.getElementById('statPending').textContent = d.data.pending;
+        document.getElementById('statApproved').textContent = d.data.approved;
+        document.getElementById('statRejected').textContent = d.data.rejected;
+      }
+    } catch { /* offline */ }
+  }
+
+  async function loadRecentLeaves() {
+    const tbody = document.getElementById('recentLeaves');
+    try {
+      const r = await fetch(BASE + '/api/leaves', { cache: 'no-store' });
+      const d = await r.json();
+      const leaves = (d.data || []).slice(0, 8);
+      if (!leaves.length) { tbody.innerHTML = '<tr><td colspan="7" class="info-text">No leave applications yet. Apply from the Apply Leave tab!</td></tr>'; return; }
+      tbody.innerHTML = leaves.map(l => `
+        <tr>
+          <td><strong>${escH(l.employeeName)}</strong><br><span style="font-size:11px;color:var(--muted)">${escH(l.employeeEmail)}</span></td>
+          <td>${escH(l.leaveType)}</td>
+          <td>${fmtDate(l.startDate)}</td>
+          <td>${fmtDate(l.endDate)}</td>
+          <td>${l.totalDays}</td>
+          <td>${badgeHtml(l.status)}</td>
+          <td>${fmtDate(l.createdAt)}</td>
+        </tr>
+      `).join('');
+    } catch {
+      tbody.innerHTML = '<tr><td colspan="7" class="info-text">Could not load data. Start the backend: node server.js</td></tr>';
+    }
+  }
+
+  // ==========================================
+  async function loadLeaves(statusFilter) {
+    if (statusFilter) currentFilter = statusFilter;
+    const tbody = document.getElementById('allLeavesBody');
+    tbody.innerHTML = '<tr><td colspan="9" class="info-text">Loading...</td></tr>';
+    try {
+      const url = currentFilter !== 'All' ? BASE + '/api/leaves?status=' + currentFilter : BASE + '/api/leaves';
+      const r = await fetch(url, { cache: 'no-store' });
+      const d = await r.json();
+      allLeaveData = d.data || [];
+      renderLeavesTable(allLeaveData);
+    } catch {
+      tbody.innerHTML = '<tr><td colspan="9" class="info-text">Backend offline. Run: node server.js</td></tr>';
+    }
+  }
+
+  function filterLeaves(f, btn) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFilter = f;
+    loadLeaves(f);
+  }
+
+  function renderLeavesTable(leaves) {
+    const tbody = document.getElementById('allLeavesBody');
+    if (!leaves.length) { tbody.innerHTML = '<tr><td colspan="9" class="info-text">No applications found.</td></tr>'; return; }
+    tbody.innerHTML = leaves.map(l => `
+      <tr>
+        <td><strong>${escH(l.employeeName)}</strong><br><span style="font-size:11px;color:var(--muted)">${escH(l.employeeEmail)}</span></td>
+        <td>${escH(l.department||'General')}</td>
+        <td>${escH(l.leaveType)}</td>
+        <td>${fmtDate(l.startDate)}</td>
+        <td>${fmtDate(l.endDate)}</td>
+        <td style="text-align:center;">${l.totalDays}</td>
+        <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escH(l.reason)}">${escH(l.reason)}</td>
+        <td>${badgeHtml(l.status)}</td>
+        <td>
+          <div class="actions-cell">
+            ${l.status==='Pending' ? `
+              <button class="btn-sm btn-approve" onclick="reviewLeave('${l._id}','Approved')">✅ Approve</button>
+              <button class="btn-sm btn-reject" onclick="reviewLeave('${l._id}','Rejected')">❌ Reject</button>
+            ` : ''}
+            <button class="btn-sm btn-del" onclick="deleteLeave('${l._id}')">🗑️</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  async function reviewLeave(id, status) {
+    const reviewer = prompt(`Enter reviewer name for "${status}" action:`, 'HR Manager');
+    if (!reviewer) return;
+    const comment = prompt('Add a comment (optional):') || '';
+    try {
+      const r = await fetch(BASE + '/api/leaves/' + id, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, reviewedBy: reviewer, reviewComment: comment })
+      });
+      const d = await r.json();
+      if (d.success) { showAlert(`✅ Leave ${status} successfully!`); loadLeaves(); loadStats(); }
+      else showAlert(d.message, true);
+    } catch { showAlert('Failed to update leave.', true); }
+  }
+
+  async function deleteLeave(id) {
+    if (!confirm('Delete this leave application?')) return;
+    try {
+      await fetch(BASE + '/api/leaves/' + id, { method: 'DELETE' });
+      showAlert('Leave application deleted.');
+      loadLeaves();
+      loadStats();
+    } catch { showAlert('Failed to delete leave.', true); }
+  }
+
+  // ==========================================
+  async function loadEmployees() {
+    const tbody = document.getElementById('empTableBody');
+    try {
+      const r = await fetch(BASE + '/api/employees', { cache: 'no-store' });
+      const d = await r.json();
+      const emps = d.data || [];
+      if (!emps.length) { tbody.innerHTML = '<tr><td colspan="8" class="info-text">No employees added yet. Use the form above!</td></tr>'; return; }
+      tbody.innerHTML = emps.map(e => `
+        <tr>
+          <td><strong>${escH(e.name)}</strong></td>
+          <td>${escH(e.email)}</td>
+          <td>${escH(e.department)}</td>
+          <td>${escH(e.role)}</td>
+          <td style="text-align:center;">${e.leaveBalance?.casual ?? 12}</td>
+          <td style="text-align:center;">${e.leaveBalance?.medical ?? 10}</td>
+          <td style="text-align:center;">${e.leaveBalance?.annual ?? 15}</td>
+          <td><button class="btn-sm btn-del" onclick="deleteEmployee('${e._id}')">🗑️</button></td>
+        </tr>
+      `).join('');
+    } catch {
+      tbody.innerHTML = '<tr><td colspan="8" class="info-text">Could not load employees. Start the backend.</td></tr>';
+    }
+  }
+
+  async function deleteEmployee(id) {
+    if (!confirm('Remove this employee?')) return;
+    try {
+      await fetch(BASE + '/api/employees/' + id, { method: 'DELETE' });
+      showAlert('Employee removed.');
+      loadEmployees();
+    } catch { showAlert('Failed to remove employee.', true); }
+  }
+
+  // ==========================================
+  // LEAVE FORM SUBMIT
+  document.getElementById('leaveForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true; btn.textContent = 'Submitting...';
+
+    const payload = {
+      employeeName: document.getElementById('empName').value.trim(),
+      employeeEmail: document.getElementById('empEmail').value.trim(),
+      department: document.getElementById('empDept').value,
+      leaveType: document.getElementById('leaveType').value,
+      startDate: document.getElementById('startDate').value,
+      endDate: document.getElementById('endDate').value,
+      reason: document.getElementById('reason').value.trim()
+    };
+
+    try {
+      const r = await fetch(BASE + '/api/leaves', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const d = await r.json();
+      if (d.success) {
+        showAlert('✅ Leave application submitted and saved to MongoDB!');
+        e.target.reset();
+        document.getElementById('daysPreview').textContent = '';
+      } else {
+        showAlert(d.message || 'Submission failed.', true);
+      }
+    } catch {
+      showAlert('❌ Cannot connect to backend. Run: node server.js', true);
+    }
+
+    btn.disabled = false; btn.textContent = 'Submit Application';
+  });
+
+  // EMPLOYEE FORM SUBMIT
+  document.getElementById('empForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const payload = {
+      name: document.getElementById('newEmpName').value.trim(),
+      email: document.getElementById('newEmpEmail').value.trim(),
+      department: document.getElementById('newEmpDept').value,
+      role: document.getElementById('newEmpRole').value
+    };
+    try {
+      const r = await fetch(BASE + '/api/employees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const d = await r.json();
+      if (d.success) { showAlert('✅ Employee added to MongoDB!'); e.target.reset(); loadEmployees(); }
+      else showAlert(d.message || 'Failed to add employee.', true);
+    } catch { showAlert('❌ Cannot connect to backend.', true); }
+  });
+
+  // DAYS PREVIEW
+  function calcDays() {
+    const s = document.getElementById('startDate').value;
+    const en = document.getElementById('endDate').value;
+    if (!s || !en) { document.getElementById('daysPreview').textContent = ''; return; }
+    let count = 0;
+    const cur = new Date(s), end = new Date(en);
+    if (cur > end) { document.getElementById('daysPreview').textContent = '⚠️ End date must be after start date'; return; }
+    while (cur <= end) { const d = cur.getDay(); if (d !== 0 && d !== 6) count++; cur.setDate(cur.getDate()+1); }
+    document.getElementById('daysPreview').textContent = `📅 ${count} working day(s)`;
+  }
+  document.getElementById('startDate').addEventListener('change', calcDays);
+  document.getElementById('endDate').addEventListener('change', calcDays);
+
+  // Set min date
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('startDate').min = today;
+  document.getElementById('endDate').min = today;
+
+  // INIT
+  checkHealth();
+  loadStats();
+  loadRecentLeaves();
+  setInterval(checkHealth, 30000);
+</script>
+</body>
+</html>
