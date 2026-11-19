@@ -272,6 +272,8 @@
 <script>
   let savedBackend = localStorage.getItem('lm_backend_url') || '';
   const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  const isVercel = location.hostname.endsWith('vercel.app');
+  if (isVercel && !savedBackend) BASE = '';
   let BASE = savedBackend || (isLocal ? 'http://localhost:5000' : '');
   let isBackendOnline = false;
   let allLeaveData = [];

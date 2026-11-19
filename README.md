@@ -112,3 +112,19 @@ Deploy your backend online in 2 minutes so your deployed GitHub Pages frontend c
 2. Click **🔗 Connect Cloud Backend** in the top-right corner.
 3. Paste your Render URL and click **Test & Save**.
 4. Your site is now live with real-time MongoDB database persistence!
+
+
+## ⚡ Deploy on Vercel (1-Click Full Stack Deployment)
+
+You can deploy the **entire application (Frontend + Express API + MongoDB)** to **Vercel** with a single click:
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FRahultn56%2FLeave-management&env=MONGODB_URI&envDescription=MongoDB%20Atlas%20URI%20(optional)&project-name=leave-management-system)
+
+### Steps to Deploy on Vercel:
+1. Click the **Deploy with Vercel** button above (or visit [vercel.com/new](https://vercel.com/new)).
+2. Connect your GitHub account and select repository: **`Rahultn56/Leave-management`**.
+3. Under **Environment Variables**, optionally add:
+   - **`MONGODB_URI`**: Your MongoDB Atlas connection string.
+4. Click **Deploy**.
+5. Within 30 seconds, Vercel will give you a live production URL (e.g. `https://leave-management-system.vercel.app`).
+6. Both your frontend UI and your Express REST API are live on the same URL!
