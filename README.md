@@ -88,3 +88,27 @@ Then open **http://localhost:5000** in your browser.
 ```js
 { employeeName, employeeEmail, department, leaveType, startDate, endDate, totalDays, reason, status, reviewedBy, reviewComment, reviewedAt }
 ```
+
+
+## ☁️ Deploy Backend Online (Render.com - 100% Free 24/7)
+
+Deploy your backend online in 2 minutes so your deployed GitHub Pages frontend connects to MongoDB 24/7!
+
+### Step 1: Deploy on Render
+1. Go to **[Render.com](https://render.com)** and log in with your GitHub account.
+2. Click **New +** > **Web Service**.
+3. Select your repository: **`Rahultn56/Leave-management`**.
+4. Render will auto-fill from `render.yaml`:
+   - **Environment**: Node
+   - **Build Command**: `npm install`
+   - **Start Command**: `node server.js`
+5. Under **Environment Variables**, add:
+   - `MONGODB_URI`: Your MongoDB Atlas URI (or leave blank to use automatic In-Memory MongoDB)
+6. Click **Deploy Web Service**.
+7. Copy your public service URL (e.g. `https://leave-management-xxxx.onrender.com`).
+
+### Step 2: Connect Frontend
+1. Open your live site: **[https://rahultn56.github.io/Leave-management/](https://rahultn56.github.io/Leave-management/)**
+2. Click **🔗 Connect Cloud Backend** in the top-right corner.
+3. Paste your Render URL and click **Test & Save**.
+4. Your site is now live with real-time MongoDB database persistence!

@@ -270,8 +270,50 @@
 </div>
 
 <script>
+  let savedBackend = localStorage.getItem('lm_backend_url') || '';
   const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-  const BASE = isLocal ? 'http://localhost:5000' : '';
+  let BASE = savedBackend || (isLocal ? 'http://localhost:5000' : '');
+
+  function openBackendModal() {
+    document.getElementById('customBackendInput').value = savedBackend;
+    document.getElementById('backendModal').style.display = 'flex';
+  }
+  function closeBackendModal() {
+    document.getElementById('backendModal').style.display = 'none';
+  }
+  async function saveBackendUrl() {
+    let url = document.getElementById('customBackendInput').value.trim().replace(/\/+$/, '');
+    if (!url) {
+      alert('Please enter a URL');
+      return;
+    }
+    showAlert('Testing connection to ' + url + '...');
+    try {
+      const r = await fetch(url + '/api/health');
+      const d = await r.json();
+      if (d.status === 'ok') {
+        localStorage.setItem('lm_backend_url', url);
+        BASE = url;
+        savedBackend = url;
+        closeBackendModal();
+        showAlert('✅ Connected successfully to ' + d.databaseType + ' on cloud backend!');
+        checkBackend();
+        loadStats();
+        loadRecentLeaves();
+        return;
+      }
+    } catch(e) {
+      alert('❌ Could not connect to ' + url + '. Make sure the backend service is running and CORS is enabled.');
+    }
+  }
+  function resetBackendUrl() {
+    localStorage.removeItem('lm_backend_url');
+    savedBackend = '';
+    BASE = isLocal ? 'http://localhost:5000' : '';
+    closeBackendModal();
+    showAlert('Reset backend to default');
+    checkBackend();
+  }
   let allLeaveData = [];
   let currentFilter = 'All';
 
@@ -558,5 +600,22 @@
   loadRecentLeaves();
   setInterval(checkHealth, 30000);
 </script>
+
+  <!-- Backend Config Modal -->
+  <div id="backendModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999;align-items:center;justify-content:center;">
+    <div style="background:white;padding:24px;border-radius:12px;max-width:480px;width:90%;box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+      <h3 style="margin-bottom:12px;color:#1e293b;">🔗 Connect Cloud Backend (Render / Railway)</h3>
+      <p style="font-size:13px;color:#64748b;margin-bottom:16px;">
+        Deploy your <code>server.js</code> on <strong>Render.com</strong> (free 24/7), then paste the backend URL below to connect this site to live MongoDB!
+      </p>
+      <label style="display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:6px;">Backend API URL:</label>
+      <input id="customBackendInput" type="url" placeholder="https://leave-management-api.onrender.com" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;margin-bottom:16px;" />
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button onclick="closeBackendModal()" style="padding:8px 16px;background:#e2e8f0;color:#475569;border:none;border-radius:6px;cursor:pointer;">Cancel</button>
+        <button onclick="resetBackendUrl()" style="padding:8px 16px;background:#f1f5f9;color:#dc2626;border:1px solid #fee2e2;border-radius:6px;cursor:pointer;">Reset</button>
+        <button onclick="saveBackendUrl()" style="padding:8px 16px;background:#4f46e5;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Test & Save</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
