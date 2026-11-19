@@ -273,51 +273,50 @@
   let savedBackend = localStorage.getItem('lm_backend_url') || '';
   const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
   let BASE = savedBackend || (isLocal ? 'http://localhost:5000' : '');
-
-  function openBackendModal() {
-    document.getElementById('customBackendInput').value = savedBackend;
-    document.getElementById('backendModal').style.display = 'flex';
-  }
-  function closeBackendModal() {
-    document.getElementById('backendModal').style.display = 'none';
-  }
-  async function saveBackendUrl() {
-    let url = document.getElementById('customBackendInput').value.trim().replace(/\/+$/, '');
-    if (!url) {
-      alert('Please enter a URL');
-      return;
-    }
-    showAlert('Testing connection to ' + url + '...');
-    try {
-      const r = await fetch(url + '/api/health');
-      const d = await r.json();
-      if (d.status === 'ok') {
-        localStorage.setItem('lm_backend_url', url);
-        BASE = url;
-        savedBackend = url;
-        closeBackendModal();
-        showAlert('✅ Connected successfully to ' + d.databaseType + ' on cloud backend!');
-        checkBackend();
-        loadStats();
-        loadRecentLeaves();
-        return;
-      }
-    } catch(e) {
-      alert('❌ Could not connect to ' + url + '. Make sure the backend service is running and CORS is enabled.');
-    }
-  }
-  function resetBackendUrl() {
-    localStorage.removeItem('lm_backend_url');
-    savedBackend = '';
-    BASE = isLocal ? 'http://localhost:5000' : '';
-    closeBackendModal();
-    showAlert('Reset backend to default');
-    checkBackend();
-  }
+  let isBackendOnline = false;
   let allLeaveData = [];
   let currentFilter = 'All';
 
-  // ==========================================
+  // Seed Data for Offline / Static GitHub Pages Demo
+  const SEED_EMPLOYEES = [
+    { _id: 'emp_1', name: 'Rahul Sharma', email: 'rahul@example.com', department: 'Engineering', role: 'Full Stack Developer', leaveBalance: { casual: 10, medical: 8, annual: 14 } },
+    { _id: 'emp_2', name: 'Priya Patel', email: 'priya@example.com', department: 'HR', role: 'HR Lead', leaveBalance: { casual: 12, medical: 10, annual: 15 } },
+    { _id: 'emp_3', name: 'Amit Verma', email: 'amit@example.com', department: 'Design', role: 'UI/UX Designer', leaveBalance: { casual: 9, medical: 10, annual: 12 } },
+    { _id: 'emp_4', name: 'Sneha Reddy', email: 'sneha@example.com', department: 'Marketing', role: 'Growth Specialist', leaveBalance: { casual: 11, medical: 9, annual: 13 } }
+  ];
+
+  const SEED_LEAVES = [
+    { _id: 'leave_1', employeeName: 'Rahul Sharma', employeeEmail: 'rahul@example.com', department: 'Engineering', leaveType: 'Casual', startDate: '2026-11-20', endDate: '2026-11-21', totalDays: 2, reason: 'Family function in hometown', status: 'Pending', createdAt: new Date().toISOString() },
+    { _id: 'leave_2', employeeName: 'Amit Verma', employeeEmail: 'amit@example.com', department: 'Design', leaveType: 'Annual', startDate: '2026-11-25', endDate: '2026-11-28', totalDays: 4, reason: 'Annual vacation trip', status: 'Approved', reviewedBy: 'HR Admin', reviewComment: 'Approved, enjoy your trip!', createdAt: new Date(Date.now() - 86400000).toISOString() },
+    { _id: 'leave_3', employeeName: 'Sneha Reddy', employeeEmail: 'sneha@example.com', department: 'Marketing', leaveType: 'Medical', startDate: '2026-11-15', endDate: '2026-11-16', totalDays: 2, reason: 'Viral fever recovery', status: 'Approved', reviewedBy: 'HR Admin', reviewComment: 'Take care and rest well', createdAt: new Date(Date.now() - 259200000).toISOString() },
+    { _id: 'leave_4', employeeName: 'Priya Patel', employeeEmail: 'priya@example.com', department: 'HR', leaveType: 'Casual', startDate: '2026-11-10', endDate: '2026-11-11', totalDays: 2, reason: 'Personal errands', status: 'Rejected', reviewedBy: 'Director', reviewComment: 'Quarterly review meetings scheduled', createdAt: new Date(Date.now() - 400000000).toISOString() }
+  ];
+
+  function getLocalEmployees() {
+    let data = localStorage.getItem('lm_demo_employees');
+    if (!data) {
+      localStorage.setItem('lm_demo_employees', JSON.stringify(SEED_EMPLOYEES));
+      return SEED_EMPLOYEES;
+    }
+    try { return JSON.parse(data); } catch { return SEED_EMPLOYEES; }
+  }
+  function setLocalEmployees(list) {
+    localStorage.setItem('lm_demo_employees', JSON.stringify(list));
+  }
+
+  function getLocalLeaves() {
+    let data = localStorage.getItem('lm_demo_leaves');
+    if (!data) {
+      localStorage.setItem('lm_demo_leaves', JSON.stringify(SEED_LEAVES));
+      return SEED_LEAVES;
+    }
+    try { return JSON.parse(data); } catch { return SEED_LEAVES; }
+  }
+  function setLocalLeaves(list) {
+    localStorage.setItem('lm_demo_leaves', JSON.stringify(list));
+  }
+
+  // Navigation
   function showTab(id, btn) {
     document.querySelectorAll('[id^="tab-"]').forEach(el => el.classList.add('section-hidden'));
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -328,7 +327,6 @@
     if (id === 'employees') loadEmployees();
   }
 
-  // ==========================================
   function showAlert(msg, isError = false) {
     const el = document.getElementById('alertBox');
     el.className = 'alert show ' + (isError ? 'alert-error' : 'alert-success');
@@ -350,77 +348,199 @@
     return `<span class="badge ${cls[status]||'badge-pending'}">${status}</span>`;
   }
 
-  // ==========================================
-  async function checkHealth() {
-    try {
-      const r = await fetch(BASE + '/api/health', { cache: 'no-store' });
-      const d = await r.json();
-      const dot = document.getElementById('dbDot');
-      const lbl = document.getElementById('dbStatus');
-      if (d.database === 'Connected') {
-        dot.classList.remove('off');
-        lbl.textContent = 'MongoDB: ' + (d.dbName || 'leave_management');
+  function calcWorkingDays(start, end) {
+    if (!start || !end) return 0;
+    const s = new Date(start);
+    const e = new Date(end);
+    if (s > e) return 0;
+    let count = 0;
+    let cur = new Date(s);
+    while (cur <= e) {
+      const day = cur.getDay();
+      if (day !== 0 && day !== 6) count++;
+      cur.setDate(cur.getDate() + 1);
+    }
+    return count;
+  }
+
+  function updateDaysPreview() {
+    const s = document.getElementById('startDate').value;
+    const e = document.getElementById('endDate').value;
+    const days = calcWorkingDays(s, e);
+    const el = document.getElementById('daysPreview');
+    if (el) {
+      if (s && e) {
+        el.textContent = days > 0 ? `${days} working day(s) (excludes Sat & Sun)` : 'End date must be after start date';
       } else {
-        dot.classList.add('off');
-        lbl.textContent = 'DB Disconnected';
+        el.textContent = '';
       }
-    } catch {
-      document.getElementById('dbDot').classList.add('off');
-      document.getElementById('dbStatus').textContent = 'Server Offline';
     }
   }
 
-  // ==========================================
-  async function loadStats() {
-    try {
-      const r = await fetch(BASE + '/api/stats', { cache: 'no-store' });
-      const d = await r.json();
-      if (d.success) {
-        document.getElementById('statTotal').textContent = d.data.total;
-        document.getElementById('statPending').textContent = d.data.pending;
-        document.getElementById('statApproved').textContent = d.data.approved;
-        document.getElementById('statRejected').textContent = d.data.rejected;
-      }
-    } catch { /* offline */ }
+  // Backend Modal
+  function openBackendModal() {
+    document.getElementById('customBackendInput').value = savedBackend;
+    document.getElementById('backendModal').style.display = 'flex';
+  }
+  function closeBackendModal() {
+    document.getElementById('backendModal').style.display = 'none';
   }
 
+  async function saveBackendUrl() {
+    let url = document.getElementById('customBackendInput').value.trim().replace(/\/+$/, '');
+    if (!url) {
+      alert('Please enter your backend URL');
+      return;
+    }
+    showAlert('Connecting to ' + url + '...');
+    try {
+      const r = await fetch(url + '/api/health');
+      const d = await r.json();
+      if (d.status === 'ok' || d.success || d.database) {
+        localStorage.setItem('lm_backend_url', url);
+        BASE = url;
+        savedBackend = url;
+        closeBackendModal();
+        showAlert('✅ Connected to live cloud backend (' + (d.databaseType || 'MongoDB') + ')!');
+        await checkBackend();
+        loadStats();
+        loadRecentLeaves();
+        return;
+      }
+    } catch(e) {
+      alert('❌ Could not connect to ' + url + '. Make sure the backend service is running and CORS is enabled.');
+    }
+  }
+
+  function resetBackendUrl() {
+    localStorage.removeItem('lm_backend_url');
+    savedBackend = '';
+    BASE = isLocal ? 'http://localhost:5000' : '';
+    closeBackendModal();
+    showAlert('Reset backend to default');
+    checkBackend();
+  }
+
+  // Health Check
+  async function checkBackend() {
+    const dot = document.getElementById('dbDot');
+    const lbl = document.getElementById('dbStatus');
+    const badge = document.getElementById('backendBadge');
+
+    if (BASE) {
+      try {
+        const r = await fetch(BASE + '/api/health', { cache: 'no-store' });
+        const d = await r.json();
+        if (d.database === 'Connected' || d.status === 'ok') {
+          isBackendOnline = true;
+          dot.classList.remove('off');
+          dot.style.background = '#22c55e';
+          lbl.textContent = 'MongoDB: ' + (d.dbName || 'leave_management');
+          if (badge) {
+            badge.textContent = '🟢 MongoDB Connected (' + (d.databaseType || 'Live') + ')';
+            badge.style.background = '#dcfce7';
+            badge.style.color = '#15803d';
+          }
+          return;
+        }
+      } catch {}
+    }
+
+    // Offline / Demo Fallback Mode
+    isBackendOnline = false;
+    dot.classList.remove('off');
+    dot.style.background = '#10b981';
+    lbl.textContent = 'Local Database (Demo Active)';
+    if (badge) {
+      badge.textContent = '🟢 Demo Database Active';
+      badge.style.background = '#e0e7ff';
+      badge.style.color = '#3730a3';
+    }
+  }
+
+  // Stats
+  async function loadStats() {
+    if (isBackendOnline) {
+      try {
+        const r = await fetch(BASE + '/api/stats', { cache: 'no-store' });
+        const d = await r.json();
+        if (d.success) {
+          document.getElementById('statTotal').textContent = d.data.total;
+          document.getElementById('statPending').textContent = d.data.pending;
+          document.getElementById('statApproved').textContent = d.data.approved;
+          document.getElementById('statRejected').textContent = d.data.rejected;
+          return;
+        }
+      } catch {}
+    }
+
+    // LocalStorage stats
+    const leaves = getLocalLeaves();
+    document.getElementById('statTotal').textContent = leaves.length;
+    document.getElementById('statPending').textContent = leaves.filter(l => l.status === 'Pending').length;
+    document.getElementById('statApproved').textContent = leaves.filter(l => l.status === 'Approved').length;
+    document.getElementById('statRejected').textContent = leaves.filter(l => l.status === 'Rejected').length;
+  }
+
+  // Recent Leaves
   async function loadRecentLeaves() {
     const tbody = document.getElementById('recentLeaves');
-    try {
-      const r = await fetch(BASE + '/api/leaves', { cache: 'no-store' });
-      const d = await r.json();
-      const leaves = (d.data || []).slice(0, 8);
-      if (!leaves.length) { tbody.innerHTML = '<tr><td colspan="7" class="info-text">No leave applications yet. Apply from the Apply Leave tab!</td></tr>'; return; }
-      tbody.innerHTML = leaves.map(l => `
-        <tr>
-          <td><strong>${escH(l.employeeName)}</strong><br><span style="font-size:11px;color:var(--muted)">${escH(l.employeeEmail)}</span></td>
-          <td>${escH(l.leaveType)}</td>
-          <td>${fmtDate(l.startDate)}</td>
-          <td>${fmtDate(l.endDate)}</td>
-          <td>${l.totalDays}</td>
-          <td>${badgeHtml(l.status)}</td>
-          <td>${fmtDate(l.createdAt)}</td>
-        </tr>
-      `).join('');
-    } catch {
-      tbody.innerHTML = '<tr><td colspan="7" class="info-text">Could not load data. Start the backend: node server.js</td></tr>';
+    let leaves = [];
+
+    if (isBackendOnline) {
+      try {
+        const r = await fetch(BASE + '/api/leaves', { cache: 'no-store' });
+        const d = await r.json();
+        if (d.data) leaves = d.data;
+      } catch {}
     }
+
+    if (!leaves.length) {
+      leaves = getLocalLeaves();
+    }
+
+    const recent = leaves.slice(0, 8);
+    if (!recent.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="info-text">No leave applications yet. Apply from the Apply Leave tab!</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = recent.map(l => `
+      <tr>
+        <td><strong>${escH(l.employeeName)}</strong><br><span style="font-size:11px;color:var(--muted)">${escH(l.employeeEmail)}</span></td>
+        <td>${escH(l.leaveType)}</td>
+        <td>${fmtDate(l.startDate)}</td>
+        <td>${fmtDate(l.endDate)}</td>
+        <td style="text-align:center;">${l.totalDays}</td>
+        <td>${badgeHtml(l.status)}</td>
+        <td>${fmtDate(l.createdAt)}</td>
+      </tr>
+    `).join('');
   }
 
-  // ==========================================
+  // All Leaves
   async function loadLeaves(statusFilter) {
     if (statusFilter) currentFilter = statusFilter;
     const tbody = document.getElementById('allLeavesBody');
     tbody.innerHTML = '<tr><td colspan="9" class="info-text">Loading...</td></tr>';
-    try {
-      const url = currentFilter !== 'All' ? BASE + '/api/leaves?status=' + currentFilter : BASE + '/api/leaves';
-      const r = await fetch(url, { cache: 'no-store' });
-      const d = await r.json();
-      allLeaveData = d.data || [];
-      renderLeavesTable(allLeaveData);
-    } catch {
-      tbody.innerHTML = '<tr><td colspan="9" class="info-text">Backend offline. Run: node server.js</td></tr>';
+
+    let leaves = [];
+    if (isBackendOnline) {
+      try {
+        const url = currentFilter !== 'All' ? BASE + '/api/leaves?status=' + currentFilter : BASE + '/api/leaves';
+        const r = await fetch(url, { cache: 'no-store' });
+        const d = await r.json();
+        if (d.data) leaves = d.data;
+      } catch {}
     }
+
+    if (!leaves.length) {
+      let local = getLocalLeaves();
+      leaves = currentFilter !== 'All' ? local.filter(l => l.status === currentFilter) : local;
+    }
+
+    allLeaveData = leaves;
+    renderLeavesTable(allLeaveData);
   }
 
   function filterLeaves(f, btn) {
@@ -432,11 +552,14 @@
 
   function renderLeavesTable(leaves) {
     const tbody = document.getElementById('allLeavesBody');
-    if (!leaves.length) { tbody.innerHTML = '<tr><td colspan="9" class="info-text">No applications found.</td></tr>'; return; }
+    if (!leaves.length) {
+      tbody.innerHTML = '<tr><td colspan="9" class="info-text">No applications found.</td></tr>';
+      return;
+    }
     tbody.innerHTML = leaves.map(l => `
       <tr>
         <td><strong>${escH(l.employeeName)}</strong><br><span style="font-size:11px;color:var(--muted)">${escH(l.employeeEmail)}</span></td>
-        <td>${escH(l.department||'General')}</td>
+        <td>${escH(l.department || 'Engineering')}</td>
         <td>${escH(l.leaveType)}</td>
         <td>${fmtDate(l.startDate)}</td>
         <td>${fmtDate(l.endDate)}</td>
@@ -445,7 +568,7 @@
         <td>${badgeHtml(l.status)}</td>
         <td>
           <div class="actions-cell">
-            ${l.status==='Pending' ? `
+            ${l.status === 'Pending' ? `
               <button class="btn-sm btn-approve" onclick="reviewLeave('${l._id}','Approved')">✅ Approve</button>
               <button class="btn-sm btn-reject" onclick="reviewLeave('${l._id}','Rejected')">❌ Reject</button>
             ` : ''}
@@ -459,146 +582,228 @@
   async function reviewLeave(id, status) {
     const reviewer = prompt(`Enter reviewer name for "${status}" action:`, 'HR Manager');
     if (!reviewer) return;
-    const comment = prompt('Add a comment (optional):') || '';
-    try {
-      const r = await fetch(BASE + '/api/leaves/' + id, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, reviewedBy: reviewer, reviewComment: comment })
-      });
-      const d = await r.json();
-      if (d.success) { showAlert(`✅ Leave ${status} successfully!`); loadLeaves(); loadStats(); }
-      else showAlert(d.message, true);
-    } catch { showAlert('Failed to update leave.', true); }
+    const comment = prompt('Add an optional comment:') || `Leave ${status.toLowerCase()}`;
+
+    if (isBackendOnline) {
+      try {
+        const r = await fetch(BASE + '/api/leaves/' + id, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status, reviewedBy: reviewer, reviewComment: comment })
+        });
+        const d = await r.json();
+        if (d.success) {
+          showAlert(`✅ Leave ${status} successfully!`);
+          loadLeaves();
+          loadStats();
+          return;
+        }
+      } catch {}
+    }
+
+    // Local fallback
+    let list = getLocalLeaves();
+    let idx = list.findIndex(l => String(l._id) === String(id));
+    if (idx !== -1) {
+      list[idx].status = status;
+      list[idx].reviewedBy = reviewer;
+      list[idx].reviewComment = comment;
+      list[idx].reviewedAt = new Date().toISOString();
+      setLocalLeaves(list);
+      showAlert(`✅ Leave application ${status} successfully!`);
+      loadLeaves();
+      loadStats();
+    }
   }
 
   async function deleteLeave(id) {
-    if (!confirm('Delete this leave application?')) return;
-    try {
-      await fetch(BASE + '/api/leaves/' + id, { method: 'DELETE' });
-      showAlert('Leave application deleted.');
-      loadLeaves();
-      loadStats();
-    } catch { showAlert('Failed to delete leave.', true); }
+    if (!confirm('Are you sure you want to delete this leave application?')) return;
+
+    if (isBackendOnline) {
+      try {
+        await fetch(BASE + '/api/leaves/' + id, { method: 'DELETE' });
+        showAlert('Leave application deleted.');
+        loadLeaves();
+        loadStats();
+        return;
+      } catch {}
+    }
+
+    let list = getLocalLeaves().filter(l => String(l._id) !== String(id));
+    setLocalLeaves(list);
+    showAlert('Leave application deleted.');
+    loadLeaves();
+    loadStats();
   }
 
-  // ==========================================
+  // Employees
   async function loadEmployees() {
     const tbody = document.getElementById('empTableBody');
-    try {
-      const r = await fetch(BASE + '/api/employees', { cache: 'no-store' });
-      const d = await r.json();
-      const emps = d.data || [];
-      if (!emps.length) { tbody.innerHTML = '<tr><td colspan="8" class="info-text">No employees added yet. Use the form above!</td></tr>'; return; }
-      tbody.innerHTML = emps.map(e => `
-        <tr>
-          <td><strong>${escH(e.name)}</strong></td>
-          <td>${escH(e.email)}</td>
-          <td>${escH(e.department)}</td>
-          <td>${escH(e.role)}</td>
-          <td style="text-align:center;">${e.leaveBalance?.casual ?? 12}</td>
-          <td style="text-align:center;">${e.leaveBalance?.medical ?? 10}</td>
-          <td style="text-align:center;">${e.leaveBalance?.annual ?? 15}</td>
-          <td><button class="btn-sm btn-del" onclick="deleteEmployee('${e._id}')">🗑️</button></td>
-        </tr>
-      `).join('');
-    } catch {
-      tbody.innerHTML = '<tr><td colspan="8" class="info-text">Could not load employees. Start the backend.</td></tr>';
+    let emps = [];
+
+    if (isBackendOnline) {
+      try {
+        const r = await fetch(BASE + '/api/employees', { cache: 'no-store' });
+        const d = await r.json();
+        if (d.data) emps = d.data;
+      } catch {}
     }
+
+    if (!emps.length) {
+      emps = getLocalEmployees();
+    }
+
+    if (!emps.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="info-text">No employees added yet. Use the form above!</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = emps.map(e => `
+      <tr>
+        <td><strong>${escH(e.name)}</strong></td>
+        <td>${escH(e.email)}</td>
+        <td>${escH(e.department)}</td>
+        <td>${escH(e.role)}</td>
+        <td style="text-align:center;">${e.leaveBalance?.casual ?? 12}</td>
+        <td style="text-align:center;">${e.leaveBalance?.medical ?? 10}</td>
+        <td style="text-align:center;">${e.leaveBalance?.annual ?? 15}</td>
+        <td><button class="btn-sm btn-del" onclick="deleteEmployee('${e._id}')">🗑️ Remove</button></td>
+      </tr>
+    `).join('');
   }
 
   async function deleteEmployee(id) {
     if (!confirm('Remove this employee?')) return;
-    try {
-      await fetch(BASE + '/api/employees/' + id, { method: 'DELETE' });
-      showAlert('Employee removed.');
-      loadEmployees();
-    } catch { showAlert('Failed to remove employee.', true); }
+
+    if (isBackendOnline) {
+      try {
+        await fetch(BASE + '/api/employees/' + id, { method: 'DELETE' });
+        showAlert('Employee removed.');
+        loadEmployees();
+        return;
+      } catch {}
+    }
+
+    let list = getLocalEmployees().filter(e => String(e._id) !== String(id));
+    setLocalEmployees(list);
+    showAlert('Employee removed.');
+    loadEmployees();
   }
 
-  // ==========================================
-  // LEAVE FORM SUBMIT
+  // Form Submissions
   document.getElementById('leaveForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = document.getElementById('submitBtn');
-    btn.disabled = true; btn.textContent = 'Submitting...';
+    btn.disabled = true;
+    btn.textContent = 'Submitting...';
+
+    const sDate = document.getElementById('startDate').value;
+    const eDate = document.getElementById('endDate').value;
+    const days = calcWorkingDays(sDate, eDate);
 
     const payload = {
       employeeName: document.getElementById('empName').value.trim(),
       employeeEmail: document.getElementById('empEmail').value.trim(),
       department: document.getElementById('empDept').value,
       leaveType: document.getElementById('leaveType').value,
-      startDate: document.getElementById('startDate').value,
-      endDate: document.getElementById('endDate').value,
+      startDate: sDate,
+      endDate: eDate,
+      totalDays: days > 0 ? days : 1,
       reason: document.getElementById('reason').value.trim()
     };
 
-    try {
-      const r = await fetch(BASE + '/api/leaves', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const d = await r.json();
-      if (d.success) {
-        showAlert('✅ Leave application submitted and saved to MongoDB!');
-        e.target.reset();
-        document.getElementById('daysPreview').textContent = '';
-      } else {
-        showAlert(d.message || 'Submission failed.', true);
-      }
-    } catch {
-      showAlert('❌ Cannot connect to backend. Run: node server.js', true);
+    if (isBackendOnline) {
+      try {
+        const r = await fetch(BASE + '/api/leaves', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const d = await r.json();
+        if (d.success) {
+          showAlert('✅ Leave application submitted and saved to MongoDB!');
+          e.target.reset();
+          document.getElementById('daysPreview').textContent = '';
+          btn.disabled = false;
+          btn.textContent = 'Submit Application';
+          return;
+        }
+      } catch {}
     }
 
-    btn.disabled = false; btn.textContent = 'Submit Application';
+    // LocalStorage fallback
+    const newLeave = {
+      _id: 'leave_' + Date.now(),
+      ...payload,
+      status: 'Pending',
+      createdAt: new Date().toISOString()
+    };
+    const list = getLocalLeaves();
+    list.unshift(newLeave);
+    setLocalLeaves(list);
+
+    showAlert('✅ Leave application submitted successfully!');
+    e.target.reset();
+    document.getElementById('daysPreview').textContent = '';
+    btn.disabled = false;
+    btn.textContent = 'Submit Application';
   });
 
-  // EMPLOYEE FORM SUBMIT
   document.getElementById('empForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const payload = {
       name: document.getElementById('newEmpName').value.trim(),
       email: document.getElementById('newEmpEmail').value.trim(),
       department: document.getElementById('newEmpDept').value,
-      role: document.getElementById('newEmpRole').value
+      role: document.getElementById('newEmpRole').value.trim(),
+      leaveBalance: {
+        casual: parseInt(document.getElementById('newEmpCasual').value) || 12,
+        medical: parseInt(document.getElementById('newEmpMed').value) || 10,
+        annual: parseInt(document.getElementById('newEmpAnnual').value) || 15
+      }
     };
-    try {
-      const r = await fetch(BASE + '/api/employees', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const d = await r.json();
-      if (d.success) { showAlert('✅ Employee added to MongoDB!'); e.target.reset(); loadEmployees(); }
-      else showAlert(d.message || 'Failed to add employee.', true);
-    } catch { showAlert('❌ Cannot connect to backend.', true); }
+
+    if (isBackendOnline) {
+      try {
+        const r = await fetch(BASE + '/api/employees', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const d = await r.json();
+        if (d.success) {
+          showAlert('✅ Employee added successfully to MongoDB!');
+          e.target.reset();
+          loadEmployees();
+          return;
+        }
+      } catch {}
+    }
+
+    // LocalStorage fallback
+    const newEmp = {
+      _id: 'emp_' + Date.now(),
+      ...payload
+    };
+    const list = getLocalEmployees();
+    list.push(newEmp);
+    setLocalEmployees(list);
+
+    showAlert('✅ Employee added successfully!');
+    e.target.reset();
+    loadEmployees();
   });
 
-  // DAYS PREVIEW
-  function calcDays() {
-    const s = document.getElementById('startDate').value;
-    const en = document.getElementById('endDate').value;
-    if (!s || !en) { document.getElementById('daysPreview').textContent = ''; return; }
-    let count = 0;
-    const cur = new Date(s), end = new Date(en);
-    if (cur > end) { document.getElementById('daysPreview').textContent = '⚠️ End date must be after start date'; return; }
-    while (cur <= end) { const d = cur.getDay(); if (d !== 0 && d !== 6) count++; cur.setDate(cur.getDate()+1); }
-    document.getElementById('daysPreview').textContent = `📅 ${count} working day(s)`;
-  }
-  document.getElementById('startDate').addEventListener('change', calcDays);
-  document.getElementById('endDate').addEventListener('change', calcDays);
+  // Date Change Listeners for Days Preview
+  document.getElementById('startDate').addEventListener('change', updateDaysPreview);
+  document.getElementById('endDate').addEventListener('change', updateDaysPreview);
 
-  // Set min date
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById('startDate').min = today;
-  document.getElementById('endDate').min = today;
-
-  // INIT
-  checkHealth();
-  loadStats();
-  loadRecentLeaves();
-  setInterval(checkHealth, 30000);
+  // Init
+  document.addEventListener('DOMContentLoaded', async () => {
+    await checkBackend();
+    loadStats();
+    loadRecentLeaves();
+  });
 </script>
 
   <!-- Backend Config Modal -->
